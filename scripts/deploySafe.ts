@@ -38,7 +38,7 @@ async function deploySafe() {
 
     const options: EthersTransactionOptions = {
       gasLimit: 1000000, // Set your gas limit here
-      gasPrice: ethers.utils.parseUnits('10', 'gwei'), // Set your gas price here
+      gasPrice: ethers.utils.parseUnits('50', 'gwei'), // Set your gas price here
     }
 
     const saltNonce = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(); // Generates a random number as a string
