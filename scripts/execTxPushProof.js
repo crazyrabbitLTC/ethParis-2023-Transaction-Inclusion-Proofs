@@ -476,6 +476,8 @@ const ERC20RewardForProofABI = [
   },
 ];
 
+const POLLING_INTERVAL_MS = 30000; // 30 seconds polling interval 
+
 import("hardhat")
   .then((hre) => {
     import("@limechain/tx-inclusion-sdk")
@@ -484,9 +486,9 @@ import("hardhat")
           .then(async (protocolKit) => {
             import("@safe-global/api-kit")
               .then(async (apiKit) => {
-                console.clear();
-                console.log("Executing Transaction via TX service...");
 
+                console.clear()
+                
                 const fs = await import("fs");
                 const dotenv = await import("dotenv");
                 const axios = await import("axios");
@@ -496,37 +498,21 @@ import("hardhat")
                 const TxInclusionSDK = module.TxInclusionSDK;
                 const txInclusionSdk = new TxInclusionSDK(RPC_URL);
 
-                const PROOVER_CONTRACT_ADDRESS =
-                  "0xCcA7ef21F5847251e3Ddf68Ed1701057Ea3D134b";
+                const PROOVER_CONTRACT_ADDRESS = "0xCcA7ef21F5847251e3Ddf68Ed1701057Ea3D134b";
                 const OWNER_PRIVATE_KEY = process.env.OWNER_1_PRIVATE_KEY;
 
-                const provider = new ethers.providers.JsonRpcProvider(
-                  process.env.GOERLI_RPC_URL
-                );
-                const signer = new ethers.Wallet(
-                  process.env.OWNER_1_PRIVATE_KEY,
-                  provider
-                );
+                const provider = new ethers.providers.JsonRpcProvider(process.env.GOERLI_RPC_URL);
+                const signer = new ethers.Wallet(process.env.OWNER_1_PRIVATE_KEY, provider);
 
                 const EthersAdapter = protocolKit.EthersAdapter;
-                //   const Safe = protocolKit
                 const Safe = protocolKit.default.default;
-
-                //   const SafeApiKit = apiKit.default;
                 const SafeApiKit = apiKit.default.default;
 
-                const owner1Signer = new ethers.Wallet(
-                  process.env.OWNER_1_PRIVATE_KEY,
-                  provider
-                );
+                const owner1Signer = new ethers.Wallet(process.env.OWNER_1_PRIVATE_KEY, provider);
 
-                const safeData = JSON.parse(
-                  fs.readFileSync("safeData.json", "utf8")
-                );
+                const safeData = JSON.parse(fs.readFileSync("safeData.json", "utf8"));
 
-                const txServiceUrl =
-                  process.env.GOERLI_TX_SERVICE ||
-                  "https://safe-transaction-goerli.safe.global";
+                const txServiceUrl = process.env.GOERLI_TX_SERVICE || "https://safe-transaction-goerli.safe.global";
                 const safeService = new SafeApiKit({
                   txServiceUrl,
                   ethAdapter: new EthersAdapter({
@@ -543,103 +529,44 @@ import("hardhat")
                   safeAddress: safeData.safeAddress,
                 });
 
-                console.log("Loading pending Transactions...");
-                const pendingTransactions =
-                  await safeService.getPendingTransactions(
-                    safeData.safeAddress
-                  );
-                console.log(
-                  `${pendingTransactions.results.length} pending transaction found.`
-                );
-                const transaction = pendingTransactions.results[0]; // Assuming the first pending transaction is the one we want to execute
+                const pollTransactions = async () => {
+                  console.log("Loading pending Transactions...");
+                  const pendingTransactions = await safeService.getPendingTransactions(safeData.safeAddress);
+                  console.log(`${pendingTransactions.results.length} pending transaction(s) found.`);
+                  
+                  if (pendingTransactions.results.length > 0) {
+                    const transaction = pendingTransactions.results[0]; 
+                    console.log("Fetching the transaction from the SafeTX Service");
+                    const safeTransaction = await safeService.getTransaction(transaction.safeTxHash);
 
-                console.log("Fetching the transaction from the SafeTX Service");
-                const safeTransaction = await safeService.getTransaction(
-                  transaction.safeTxHash
-                );
+                    console.log(`Executing transaction for safeTransaction with hash: ${safeTransaction.safeTxHash}`);
+                    const executeTxResponse = await safeSdkOwner1.executeTransaction(safeTransaction);
 
-                console.log(
-                  `Executing transaction for safeTransaction with hash: ${safeTransaction.safeTxHash}`
-                );
-                const executeTxResponse =
-                  await safeSdkOwner1.executeTransaction(safeTransaction);
+                    const receipt = await executeTxResponse.transactionResponse?.wait();
+                    const executedTxHash = receipt?.transactionHash;
+                    console.log("Transaction executed with hash: ", receipt?.transactionHash);
+                    console.log(`https://goerli.etherscan.io/tx/${receipt?.transactionHash}`);
 
-                const receipt =
-                  await executeTxResponse.transactionResponse?.wait();
+                    console.log("Creating Proof...");
+                    const txInclusionProof = await txInclusionSdk.getTransactionInclusionProof(executedTxHash);
+                    console.log("Proof Created.");
+                    const contract = new ethers.Contract(PROOVER_CONTRACT_ADDRESS, ERC20RewardForProofABI, signer);
+                    console.log("Proving inclusion...");
+                    const tx = await contract.claimReward(txInclusionProof);
+                    const proofReceipt = await tx.wait();
+                    console.log(`Transaction hash: ${proofReceipt.transactionHash}`);
+                  }
+                };
 
-                const executedTxHash = receipt?.transactionHash;
-
-                console.log(
-                  "Transaction executed with hash: ",
-                  receipt?.transactionHash
-                );
-                console.log(
-                  `https://goerli.etherscan.io/tx/${receipt?.transactionHash}`
-                );
-
-                console.log("Creating Proof...");
-                const txInclusionProof =
-                  await txInclusionSdk.getTransactionInclusionProof(
-                    executedTxHash
-                  );
-
-                console.log("Proof Created.");
-                const contract = new ethers.Contract(
-                  PROOVER_CONTRACT_ADDRESS,
-                  ERC20RewardForProofABI,
-                  signer
-                );
-
-                // ** THIS IS FOR DEMO PURPOSES, NORMALLY THE RELAYER IS ADDING BLOCKS TO ORACLE **//
-                console.log("Adding block data to Oracle...");
-                const oracleContractAddress = process.env.ORACLE_ADDRESS;
-                const oracleContractABI = [
-                  "function setBlockHashes(uint256[], bytes32[]) public",
-                ];
-                const oracleContract = new ethers.Contract(
-                  oracleContractAddress,
-                  oracleContractABI,
-                  signer
-                );
-
-                const blockNumber = await provider.getBlockNumber();
-                const blockHash = (await provider.getBlock(blockNumber)).hash;
-
-                console.log(
-                  `Block number: ${blockNumber} Block hash: ${blockHash}`
-                );
-
-                await oracleContract.setBlockHashes([blockNumber], [blockHash]);
-
-                console.log("Block data added to Oracle.");
-
-                 // ** THIS IS FOR DEMO PURPOSES, NORMALLY THE RELAYER IS ADDING BLOCKS TO ORACLE **//
-                console.log("Proving inclusion...");
-                const tx = await contract.claimReward(txInclusionProof);
-                const proofReceipt = await tx.wait();
-                console.log(
-                  `Transaction hash: ${proofReceipt.transactionHash}`
-                );
+                // Initially call the function
+                await pollTransactions();
+                
+                // Set the interval for calling the function
+                setInterval(pollTransactions, POLLING_INTERVAL_MS);
+                
               })
               .catch((error) => {
-                if (error.reason) {
-                  console.error(
-                    "Error creating transaction inclusion proof:",
-                    `Reason: ${error.reason}`
-                  );
-                }
-
-                if (error.code) {
-                  console.error(`Code: ${error.code}`);
-                }
-
-                if (error.method) {
-                  console.error(`Method: ${error.method}`);
-                }
-
-                if (error.transaction) {
-                  console.error(`Transaction: `, error.transaction);
-                }
+                console.error(error);
               });
           })
           .catch((err) => console.log(err));
