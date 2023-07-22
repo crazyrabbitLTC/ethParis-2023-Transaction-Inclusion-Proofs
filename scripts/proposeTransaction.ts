@@ -150,6 +150,7 @@ async function sendTxToTransactionPoster(
 
 
 async function proposeTransaction() {
+  console.clear()
   console.log("Proposing a TX to your safe");
   try {
     const RPC_URL = process.env.GOERLI_RPC_URL;
