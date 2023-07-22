@@ -478,177 +478,248 @@ const ERC20RewardForProofABI = [
 
 const POLLING_INTERVAL_MS = 30000; // 30 seconds polling interval
 
-import("hardhat")
-  .then((hre) => {
-    import("@limechain/tx-inclusion-sdk")
-      .then((module) => {
-        import("@safe-global/protocol-kit")
-          .then(async (protocolKit) => {
-            import("@safe-global/api-kit")
-              .then(async (apiKit) => {
-                console.clear();
+////aaaaaaaaaa so badddddd but don't have time to mix modules...
+import("hardhat").then((hre) => {
+  import("@limechain/tx-inclusion-sdk").then((module) => {
+    import("@safe-global/protocol-kit")
+      .then(async (protocolKit) => {
+        import("@safe-global/api-kit")
+          .then(async (apiKit) => {
+            import("chalk")
+              .then(async (chalkModule) => {
+                const chalk = chalkModule.default || chalkModule;
+                import("node-emoji")
+                  .then(async (emojiModule) => {
+                    const emoji = emojiModule.default || emojiModule;
+                    console.clear();
 
-                const fs = await import("fs");
-                const dotenv = await import("dotenv");
-                const axios = await import("axios");
-                dotenv.config();
+                    const fs = await import("fs");
+                    const dotenv = await import("dotenv");
+                    const axios = await import("axios");
+                    dotenv.config();
 
-                // USING CELO
-                const GOERLI_RPC_URL = process.env.GOERLI_RPC_URL;
-                const RPC_URL = process.env.CELO_RPC_URL;
+                    // USING CELO
+                    const GOERLI_RPC_URL = process.env.GOERLI_RPC_URL;
+                    const RPC_URL = process.env.CELO_RPC_URL;
 
-                const PROVER_CONTRACT_ADDRESS = process.env.CELO_PROVER_ADDRESS;
+                    const PROVER_CONTRACT_ADDRESS =
+                      process.env.CELO_PROVER_ADDRESS;
 
-                // const OWNER_PRIVATE_KEY = process.env.OWNER_1_PRIVATE_KEY;
+                    // const OWNER_PRIVATE_KEY = process.env.OWNER_1_PRIVATE_KEY;
 
-                // USING CELO
-                const goerli_provider = new ethers.providers.JsonRpcProvider(
-                  process.env.GOERLI_RPC_URL
-                );
-                const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-                const signer = new ethers.Wallet(
-                  process.env.OWNER_1_PRIVATE_KEY,
-                  provider
-                );
-
-                const EthersAdapter = protocolKit.EthersAdapter;
-                const Safe = protocolKit.default.default;
-                const SafeApiKit = apiKit.default.default;
-
-                const owner1Signer = new ethers.Wallet(
-                  process.env.OWNER_1_PRIVATE_KEY,
-                  provider
-                );
-                const goerli_owner1Signer = new ethers.Wallet(
-                  process.env.OWNER_1_PRIVATE_KEY,
-                  goerli_provider
-                );
-
-                const safeData = JSON.parse(
-                  fs.readFileSync("safeData.json", "utf8")
-                );
-
-                const txServiceUrl =
-                  process.env.GOERLI_TX_SERVICE ||
-                  "https://safe-transaction-goerli.safe.global";
-                const safeService = new SafeApiKit({
-                  txServiceUrl,
-                  ethAdapter: new EthersAdapter({
-                    ethers,
-                    signerOrProvider: goerli_owner1Signer,
-                  }),
-                });
-
-                const safeSdkOwner1 = await Safe.create({
-                  ethAdapter: new EthersAdapter({
-                    ethers,
-                    signerOrProvider: goerli_owner1Signer,
-                  }),
-                  safeAddress: safeData.safeAddress,
-                });
-
-                const pollTransactions = async () => {
-                  //   console.log(cliSpinners.aesthetic);
-                  console.log("Loading pending Transactions...");
-
-                  const pendingTransactions =
-                    await safeService.getPendingTransactions(
-                      safeData.safeAddress
+                    // USING CELO
+                    const goerli_provider =
+                      new ethers.providers.JsonRpcProvider(
+                        process.env.GOERLI_RPC_URL
+                      );
+                    const provider = new ethers.providers.JsonRpcProvider(
+                      RPC_URL
                     );
-                  console.log(
-                    `${pendingTransactions.results.length} pending transaction(s) found.`
-                  );
-
-                  if (pendingTransactions.results.length > 0) {
-                    const transaction = pendingTransactions.results[0];
-                    console.log(
-                      "Fetching the transaction from the SafeTX Service"
-                    );
-                    const safeTransaction = await safeService.getTransaction(
-                      transaction.safeTxHash
+                    const signer = new ethers.Wallet(
+                      process.env.OWNER_1_PRIVATE_KEY,
+                      provider
                     );
 
-                    console.log(
-                      `Executing transaction for safeTransaction with hash: ${safeTransaction.safeTxHash}`
-                    );
-                    const executeTxResponse =
-                      await safeSdkOwner1.executeTransaction(safeTransaction);
+                    const EthersAdapter = protocolKit.EthersAdapter;
+                    const Safe = protocolKit.default.default;
+                    const SafeApiKit = apiKit.default.default;
 
-                    const receipt =
-                      await executeTxResponse.transactionResponse?.wait();
-                    const executedTxHash = receipt?.transactionHash;
-                    console.log(
-                      "Transaction executed with hash: ",
-                      executedTxHash
+                    const owner1Signer = new ethers.Wallet(
+                      process.env.OWNER_1_PRIVATE_KEY,
+                      provider
                     );
-                    console.log(
-                      `https://goerli.etherscan.io/tx/${executedTxHash}`
+                    const goerli_owner1Signer = new ethers.Wallet(
+                      process.env.OWNER_1_PRIVATE_KEY,
+                      goerli_provider
                     );
 
-                    // Add Block Data to Trusted Oracle
-                    console.log("Adding block data to Oracle...");
-                    const oracleContractAddress =
-                      process.env.CELO_ORACLE_ADDRESS;
-                    const oracleContractABI = [
-                      "function setBlockHashes(uint256[], bytes32[]) public",
-                    ];
-                    const oracleContract = new ethers.Contract(
-                      oracleContractAddress,
-                      oracleContractABI,
-                      signer
+                    const safeData = JSON.parse(
+                      fs.readFileSync("safeData.json", "utf8")
                     );
 
-                    const blockNumber = await provider.getBlockNumber();
-                    const blockHash = (await provider.getBlock(blockNumber))
-                      .hash;
+                    const txServiceUrl =
+                      process.env.GOERLI_TX_SERVICE ||
+                      "https://safe-transaction-goerli.safe.global";
+                    const safeService = new SafeApiKit({
+                      txServiceUrl,
+                      ethAdapter: new EthersAdapter({
+                        ethers,
+                        signerOrProvider: goerli_owner1Signer,
+                      }),
+                    });
 
-                    console.log(
-                      `Block number: ${blockNumber} Block hash: ${blockHash}`
-                    );
+                    const safeSdkOwner1 = await Safe.create({
+                      ethAdapter: new EthersAdapter({
+                        ethers,
+                        signerOrProvider: goerli_owner1Signer,
+                      }),
+                      safeAddress: safeData.safeAddress,
+                    });
 
-                    await oracleContract.setBlockHashes(
-                      [blockNumber],
-                      [blockHash]
-                    );
-
-                    console.log("Block data added to Oracle.");
-
-                    const TxInclusionSDK = module.TxInclusionSDK;
-                    const txInclusionSdk = new TxInclusionSDK(GOERLI_RPC_URL);
-
-                    console.log("Creating Proof...");
-                    const txInclusionProof =
-                      await txInclusionSdk.getTransactionInclusionProof(
-                        executedTxHash
+                    const pollTransactions = async () => {
+                      //   console.log(cliSpinners.aesthetic);
+                      console.log(
+                        emoji.get("mag") +
+                          " " +
+                          chalk.blue(
+                            "Fetching the transaction from the SafeTX Service..."
+                          )
                       );
 
-                    console.log("Proof Created.");
-                    const contract = new ethers.Contract(
-                      PROVER_CONTRACT_ADDRESS,
-                      ERC20RewardForProofABI,
-                      signer
-                    );
-                    console.log("Proving inclusion...");
-                    const tx = await contract.claimReward(txInclusionProof);
-                    const proofReceipt = await tx.wait();
-                    console.log(
-                      `Transaction hash: ${proofReceipt.transactionHash}`
-                    );
-                  }
-                };
+                      const pendingTransactions =
+                        await safeService.getPendingTransactions(
+                          safeData.safeAddress
+                        );
+                      console.log(
+                        `${pendingTransactions.results.length} pending transaction(s) found.`
+                      );
 
-                // Initially call the function
-                await pollTransactions();
+                      if (pendingTransactions.results.length > 0) {
+                        const transaction = pendingTransactions.results[0];
 
-                // Set the interval for calling the function
-                setInterval(pollTransactions, POLLING_INTERVAL_MS);
+                        const safeTransaction =
+                          await safeService.getTransaction(
+                            transaction.safeTxHash
+                          );
+
+                          console.log(
+                            emoji.get("hourglass_flowing_sand") +
+                              " " +
+                              chalk.yellow(
+                                `Executing transaction for safeTransaction with hash: ${chalk.cyan(
+                                  safeTransaction.safeTxHash
+                                )}`
+                              )
+                          );
+                        const executeTxResponse =
+                          await safeSdkOwner1.executeTransaction(
+                            safeTransaction
+                          );
+
+                        const receipt =
+                          await executeTxResponse.transactionResponse?.wait();
+                        const executedTxHash = receipt?.transactionHash;
+                        console.log(
+                          emoji.get("checkered_flag") +
+                            " " +
+                            chalk.green(
+                              "Transaction executed with hash: ",
+                              chalk.magenta(executedTxHash)
+                            )
+                        );
+                        console.log(
+                          chalk.blue(
+                            `https://goerli.etherscan.io/tx/${chalk.underline(
+                              executedTxHash
+                            )}`
+                          )
+                        );
+
+                        // Add Block Data to Trusted Oracle
+                        console.log(
+                          emoji.get("crystal_ball") +
+                            " " +
+                            chalk.blue("Adding block data to Oracle...")
+                        );
+                        const oracleContractAddress =
+                          process.env.CELO_ORACLE_ADDRESS;
+                        const oracleContractABI = [
+                          "function setBlockHashes(uint256[], bytes32[]) public",
+                        ];
+                        const oracleContract = new ethers.Contract(
+                          oracleContractAddress,
+                          oracleContractABI,
+                          signer
+                        );
+
+                        const blockNumber = await goerli_provider.getBlockNumber();
+                        const blockHash = (await goerli_provider.getBlock(blockNumber))
+                          .hash;
+
+                        console.log(
+                          chalk.cyan(
+                            `Block number: ${blockNumber} Block hash: ${blockHash}`
+                          )
+                        );
+                        await oracleContract.setBlockHashes(
+                          [blockNumber],
+                          [blockHash]
+                        );
+
+                        console.log(
+                          emoji.get("white_check_mark") +
+                            " " +
+                            chalk.green("Block data added to Oracle.")
+                        );
+
+                        const TxInclusionSDK = module.TxInclusionSDK;
+                        const txInclusionSdk = new TxInclusionSDK(
+                          GOERLI_RPC_URL
+                        );
+
+                        console.log(
+                          emoji.get("bulb") +
+                            " " +
+                            chalk.yellow("Creating Proof...")
+                        );
+
+                        const txInclusionProof =
+                          await txInclusionSdk.getTransactionInclusionProof(
+                            executedTxHash
+                          );
+
+                        console.log(
+                          emoji.get("star") +
+                            " " +
+                            chalk.green("Proof Created.")
+                        );
+
+                        const contract = new ethers.Contract(
+                          PROVER_CONTRACT_ADDRESS,
+                          ERC20RewardForProofABI,
+                          signer
+                        );
+                        console.log(
+                          emoji.get("rocket") +
+                            " " +
+                            chalk.blue("Proving inclusion...")
+                        );
+                        const tx = await contract.claimReward(txInclusionProof);
+                        const proofReceipt = await tx.wait();
+                        console.log(
+                          emoji.get("trophy") +
+                            " " +
+                            chalk.white(
+                              `Success!`
+                            )
+                        );
+
+                        console.log(
+                            emoji.get("trophy") +
+                              " " +
+                              chalk.green(
+                                `Transaction hash for refund: ${chalk.magenta(
+                                  proofReceipt.transactionHash
+                                )}`
+                              )
+                          );
+                      }
+                    };
+
+                    // Initially call the function
+                    await pollTransactions();
+
+                    // Set the interval for calling the function
+                    setInterval(pollTransactions, POLLING_INTERVAL_MS);
+                  })
+                  .catch((error) => {
+                    console.error(error);
+                  });
               })
-              .catch((error) => {
-                console.error(error);
-              });
+              .catch((err) => console.log(err));
           })
           .catch((err) => console.log(err));
       })
       .catch((err) => console.log(err));
-  })
-  .catch((err) => console.log(err));
+  });
+});
