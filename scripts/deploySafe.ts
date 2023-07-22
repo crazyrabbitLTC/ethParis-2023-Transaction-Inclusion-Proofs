@@ -1,5 +1,5 @@
 import { ethers } from 'ethers'
-import { EthersAdapter } from '@safe-global/protocol-kit'
+import { EthersAdapter, EthersTransactionOptions } from '@safe-global/protocol-kit'
 import SafeApiKit from '@safe-global/api-kit'
 import { SafeFactory } from '@safe-global/protocol-kit'
 import { SafeAccountConfig } from '@safe-global/protocol-kit'
@@ -36,7 +36,14 @@ async function deploySafe() {
       threshold: 1,
     }
 
-    const safeSdkOwner1 = await safeFactory.deploySafe({ safeAccountConfig })
+    const options: EthersTransactionOptions = {
+      gasLimit: 1000000, // Set your gas limit here
+      gasPrice: ethers.utils.parseUnits('10', 'gwei'), // Set your gas price here
+    }
+
+    const saltNonce = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(); // Generates a random number as a string
+
+    const safeSdkOwner1 = await safeFactory.deploySafe({ safeAccountConfig, options, saltNonce })
 
     const safeAddress = await safeSdkOwner1.getAddress()
 
