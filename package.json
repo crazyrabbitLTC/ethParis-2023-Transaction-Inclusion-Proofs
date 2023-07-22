@@ -12,6 +12,7 @@
     "chalk": "^5.3.0",
     "dotenv": "^16.3.1",
     "eth-util-lite": "^1.0.1",
-    "ethers": "5.7.2"
+    "ethers": "5.7.2",
+    "node-notifier": "^10.0.1"
   }
 }
